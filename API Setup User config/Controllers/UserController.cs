@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using API_Setup_User_config.Models;
 using MongoDB.Driver.Linq;
+using System.Text.Json;
+using Newtonsoft.Json;
+using Microsoft.AspNetCore.Authentication;
 
 namespace API_Setup_User_config.Controllers
 {
@@ -14,18 +17,57 @@ namespace API_Setup_User_config.Controllers
     [ApiController]
     public class UserController : ControllerBase
     {
-        public List<List<UserClass>> Database = new List<List<UserClass>>();
-        public IMongoDatabase client = new MongoClient("mongodb://GateKeeper:silvereye@localhost:27017").GetDatabase("Virksomhed");
+        public List<List<UserClass>> DatabaseGet = new List<List<UserClass>>();
+        public UserClass DatabaseGetOne { get;set; }
+        public SaltClass DatabasePost { get; set; }
 
-        void dbSetup()
+        bool dbSetup(string user, string pass, string usage, int? value, string match)
         {
-            var userQuery = from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
-                            select c;
-            foreach (UserClass output in userQuery)
+            IMongoDatabase client = new MongoClient($"mongodb://{user}:{pass}@localhost:27017").GetDatabase("Virksomhed");
+            var result = true;
+
+            if (usage == "get")
             {
-                List<UserClass> userClasses = new List<UserClass>{ output };
-                Database.Add(userClasses);
+
+                var userQuery = from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
+                                select c;
+
+                foreach (UserClass output in userQuery)
+                {
+                    List<UserClass> userClasses = new List<UserClass> { output };
+                    DatabaseGet.Add(userClasses);
+                }
             }
+            else if (usage == "getOne")
+            {
+             var usageQuery =
+                from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
+                where c._id == value
+                select c;
+
+                foreach (UserClass output in usageQuery)
+                {
+                    DatabaseGetOne = output;
+                }
+            }
+            else if (usage == "post")
+            {
+                var usageQuery = from c in client.GetCollection<SaltClass>(SaltClass.Name).AsQueryable()
+                                 where c._id == value
+                                 select c;
+
+                foreach (SaltClass output in usageQuery)
+                {
+                    DatabasePost = output;
+                }
+                dbSetup("GateKeeper", "silvereye", "getOne", value, null);
+                if (
+                Sha256.Sha256Hash(match, DatabasePost.Salt) != DatabaseGetOne.Password)
+                {
+                    result = false;
+                }
+            }
+            return result;
         }
         // GET: api/User
         [HttpGet]
@@ -33,8 +75,8 @@ namespace API_Setup_User_config.Controllers
         {
             try
             {
-                dbSetup();
-                return Ok(Database);
+                dbSetup("GateKeeper","silvereye", "get", null, null);
+                return Ok(DatabaseGet);
             }
             catch (Exception e)
             {
@@ -46,16 +88,23 @@ namespace API_Setup_User_config.Controllers
         [HttpGet("{id}", Name = "Get")]
         public ActionResult Get(int id)
         {
-
-            return Ok (from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
-                   where c._id == id
-                   select c);
+            dbSetup("GateKeeper", "silvereye", "getOne", id, null);
+            return Ok(DatabaseGetOne);
         }
 
         // POST: api/User
         [HttpPost]
-        public void Post([FromBody] string value)
+        public ActionResult Post([FromBody] JsonElement json)
         {
+            string match = json.GetString("match").ToString();
+
+            int id = Convert.ToInt32( json.GetString("id"));
+
+            Post post = new Post(id, match); 
+            //  var test = JsonConvert.DeserializeObject<Post>(json);
+
+            return Ok(dbSetup("System", "silvereye", "post", post.id, post.match));
+           // return Ok();
         }
 
         // PUT: api/User/5
