@@ -101,10 +101,7 @@ namespace API_Setup_User_config.Controllers
             int id = Convert.ToInt32( json.GetString("id"));
 
             Post post = new Post(id, match); 
-            //  var test = JsonConvert.DeserializeObject<Post>(json);
-
             return Ok(dbSetup("System", "silvereye", "post", post.id, post.match));
-           // return Ok();
         }
 
         // PUT: api/User/5
