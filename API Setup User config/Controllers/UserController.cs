@@ -25,47 +25,49 @@ namespace API_Setup_User_config.Controllers
         {
             IMongoDatabase client = new MongoClient($"mongodb://{user}:{pass}@localhost:27017").GetDatabase("Virksomhed");
             var result = true;
-
-            if (usage == "get")
+            switch (usage)
             {
+                case "get":
+                    var userQuery = from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
+                                    select c;
 
-                var userQuery = from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
-                                select c;
+                    foreach (UserClass output in userQuery)
+                    {
+                        List<UserClass> userClasses = new List<UserClass> { output };
+                        DatabaseGet.Add(userClasses);
+                    }
+                    break;
 
-                foreach (UserClass output in userQuery)
-                {
-                    List<UserClass> userClasses = new List<UserClass> { output };
-                    DatabaseGet.Add(userClasses);
-                }
-            }
-            else if (usage == "getOne")
-            {
-             var usageQuery =
-                from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
-                where c._id == value
-                select c;
+                case "getOne":
 
-                foreach (UserClass output in usageQuery)
-                {
-                    DatabaseGetOne = output;
-                }
-            }
-            else if (usage == "post")
-            {
-                var usageQuery = from c in client.GetCollection<SaltClass>(SaltClass.Name).AsQueryable()
-                                 where c._id == value
-                                 select c;
+                    var usageQuery =
+                       from c in client.GetCollection<UserClass>(UserClass.Name).AsQueryable()
+                       where c._id == value
+                       select c;
 
-                foreach (SaltClass output in usageQuery)
-                {
-                    DatabasePost = output;
-                }
-                dbSetup("GateKeeper", "silvereye", "getOne", value, null);
-                if (
-                Sha256.Sha256Hash(match, DatabasePost.Salt) != DatabaseGetOne.Password)
-                {
-                    result = false;
-                }
+                    foreach (UserClass output in usageQuery)
+                    {
+                        DatabaseGetOne = output;
+                    }
+            
+                    break;
+
+                case "post":
+                    var postUsageQuery = from c in client.GetCollection<SaltClass>(SaltClass.Name).AsQueryable()
+                                     where c._id == value
+                                     select c;
+
+                    foreach (SaltClass output in postUsageQuery)
+                    {
+                        DatabasePost = output;
+                    }
+                    dbSetup("GateKeeper", "silvereye", "getOne", value, null);
+                    if (
+                    Sha256.Sha256Hash(match, DatabasePost.Salt) != DatabaseGetOne.Password)
+                    {
+                        result = false;
+                    }
+                    break;
             }
             return result;
         }
